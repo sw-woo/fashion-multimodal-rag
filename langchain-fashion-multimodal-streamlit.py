@@ -74,8 +74,7 @@ def get_existing_ids(image_vdb,dataset_folder):
         num_images = len([name for name in os.listdir(dataset_folder)])
         print(f"데이터 폴더 전체 이미지수:{num_images}")
 
-        records = image_vdb.query(
-            query_texts=[""], n_results=num_images, include=["ids"])
+        records = image_vdb.get(include=["ids"], limit=num_images)
         for record in records["ids"]:
             existing_ids.update(record)
             print(f"{len(existing_ids)}")
