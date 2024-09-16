@@ -7,5 +7,6 @@ langchain-openai
 streamlit-extras
 datasets
 chromadb
+torch
 open-clip-torch
 protobuf==3.19.0
