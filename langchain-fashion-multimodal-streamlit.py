@@ -95,6 +95,7 @@ def add_images_to_db(image_vdb, dataset_folder):
                 file_path = os.path.join(dataset_folder, filename)
                 ids.append(img_id)
                 uris.append(file_path)
+                print(f"증가 되는 부분 표시{len(ids)}")
     if ids:
         image_vdb.add(ids=ids, uris=uris)
         print("새로운 이미지를 데이터베이스에 추가했습니다.")
