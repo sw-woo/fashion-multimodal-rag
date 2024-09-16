@@ -77,9 +77,9 @@ def get_existing_ids(image_vdb,dataset_folder):
             query_texts=[""], n_results=num_images, include=["ids"])
         for record in records["ids"]:
             existing_ids.update(record)
-            print(f"{len(record)} 존재 IDs")
+            print(f"{len(existing_ids)}")
     except Exception as e:
-        print(f"{len(record)}개의 기존 IDs가 있습니다.")
+        print(f"기존 IDs를 가져오는 중 오류 발생: {e}")
     return existing_ids
 
 # 이미지를 데이터베이스에 추가하는 함수
