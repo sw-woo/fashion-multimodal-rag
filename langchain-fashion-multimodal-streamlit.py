@@ -142,10 +142,12 @@ def setup_vision_chain():
 
 # 프롬프트 입력을 포맷하는 함수
 def format_prompt_inputs(data, user_query):
+    print(f"result data: {data}")
     inputs = {}
 
     # 사용자 쿼리를 딕셔너리에 추가
     inputs['user_query'] = user_query
+    
     image_path_1 = data['uris'][0][0]
     image_path_2 = data['uris'][0][1]
 
@@ -201,7 +203,7 @@ def main():
         with st.spinner("번역 및 쿼리 진행 중..."):
             query_en = translate(query_ko, "English")
             results = query_db(image_vdb, query_en, results=2)
-            
+
             # 쿼리 결과 확인
             if not results or not results.get('uris') or not results['uris'][0]:
                 st.error("쿼리 결과가 없습니다. 다른 질문을 시도해 보세요.")
