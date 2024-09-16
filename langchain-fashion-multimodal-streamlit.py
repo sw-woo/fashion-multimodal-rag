@@ -200,6 +200,10 @@ def main():
         with st.spinner("번역 및 쿼리 진행 중..."):
             query_en = translate(query_ko, "English")
             results = query_db(image_vdb, query_en, results=2)
+            # 쿼리 결과 확인
+            if not results or not results.get('uris') or not results['uris'][0]:
+                st.error("쿼리 결과가 없습니다. 다른 질문을 시도해 보세요.")
+
             prompt_input = format_prompt_inputs(results, query_en)
             response_en = vision_chain.invoke(prompt_input)
             response_ko = translate(response_en, "Korean")
