@@ -63,7 +63,7 @@ def setup_chroma_db():
     clip = OpenCLIPEmbeddingFunction()
     # 이미지 데이터베이스 생성 또는 가져오기
     image_vdb = chroma_client.get_or_create_collection(
-        name="image", embedding_function=clip, data_loader=image_loader)
+        name="Streamlit", embedding_function=clip, data_loader=image_loader)
     return image_vdb
 
 # 기존에 존재하는 이미지 IDs를 가져오는 함수
