@@ -13,6 +13,7 @@ from datasets import load_dataset
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
 
 
 
@@ -55,7 +56,7 @@ def setup_chroma_db():
     # 벡터 데이터베이스 저장 경로 설정
     vdb_path = os.path.join(SCRIPT_DIR, 'img_vdb')
     # Chroma 클라이언트 초기화
-    chroma_client = chromadb.PersistentClient(path=vdb_path)
+    chroma_client = chromadb.PersistentClient(path=vdb_path,settings=Settings(),tenant=DEFAULT_TENANT,database=DEFAULT_DATABASE)
     # 이미지 로더 및 OpenCLIP 임베딩 함수 설정
     image_loader = ImageLoader()
     clip = OpenCLIPEmbeddingFunction()
