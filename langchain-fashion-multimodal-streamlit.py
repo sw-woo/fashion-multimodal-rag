@@ -10,6 +10,11 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
+# 베포시 chroma db에서 sqlite3를 사용하는데 오류가 나서 추가하였습니다.
+import sys
+__import__('pysqlite3')
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 # .env 파일에서 환경 변수 로드
 load_dotenv()
 
