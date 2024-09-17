@@ -37,7 +37,7 @@ os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 데이터셋을 설정하는 함수
-def setup_dataset(num_samples=60):
+def setup_dataset(num_samples=50):
     # 패션 관련 데이터셋 불러오기
     dataset_stream = load_dataset("detection-datasets/fashionpedia", split='train',streaming=True)
     # 데이터셋의 첫 500개 샘플만 가져오기
