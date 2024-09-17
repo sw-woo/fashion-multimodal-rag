@@ -1,7 +1,3 @@
-import sys
-__import__('pysqlite3')
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
 import os
 import base64
 import streamlit as st
@@ -12,9 +8,8 @@ from datasets import load_dataset
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
-from itertools import islice
 from io import BytesIO
+from itertools import islice
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -30,11 +25,9 @@ if not OPENAI_API_KEY:
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
 # 데이터셋을 설정하는 함수
-def setup_dataset(num_samples=10):
-    # 패션 관련 데이터셋 불러오기
-    dataset_stream = load_dataset("detection-datasets/fashionpedia", split='train', streaming=True)
-    # 데이터셋의 첫 num_samples 샘플만 가져오기
-    dataset = list(islice(dataset_stream, num_samples))
+def setup_dataset(num_samples=50):
+    # 패션 관련 데이터셋 불러오기 (비스트리밍 모드)
+    dataset = load_dataset("detection-datasets/fashionpedia", split=f"train[:{num_samples}]")
     return dataset
 
 # 데이터셋에서 이미지를 가져오는 함수
@@ -43,16 +36,14 @@ def get_images_from_dataset(dataset):
     for i, sample in enumerate(dataset):
         image = sample['image']
         # 이미지 크기를 조정하여 메모리 사용량 줄이기
-        image = image.resize((32, 32))
+        image = image.resize((128, 128))
         images.append(image)
     return images
 
 # Chroma 데이터베이스를 설정하는 함수
 def setup_chroma_db():
-    # 벡터 데이터베이스 저장 경로 설정
-    vdb_path = os.path.join(os.getcwd(), 'img_vdb')
-    # Chroma 클라이언트 초기화
-    chroma_client = chromadb.PersistentClient(path=vdb_path, settings=Settings(), tenant=DEFAULT_TENANT, database=DEFAULT_DATABASE)
+    # Chroma 클라이언트 초기화 (인메모리 모드)
+    chroma_client = chromadb.Client()
     # OpenCLIP 임베딩 함수 설정
     clip = OpenCLIPEmbeddingFunction()
     # 이미지 데이터베이스 생성 또는 가져오기
@@ -63,6 +54,9 @@ def setup_chroma_db():
 # 이미지를 데이터베이스에 추가하는 함수
 def add_images_to_db(image_vdb, images):
     ids = []
+    if len(image_vdb.get()['ids']) > 0:
+        print("이미지가 이미 데이터베이스에 추가되어 있습니다.")
+        return
     for i, image in enumerate(images):
         img_id = str(i)
         ids.append(img_id)
@@ -97,14 +91,14 @@ def translate(text, target_lang):
 # 시각적 정보를 처리하는 체인을 설정하는 함수
 def setup_vision_chain():
     # GPT-4 모델을 사용하여 시각적 정보를 처리
-    gpt4 = ChatOpenAI(model="gpt-4o", temperature=0.0)
+    gpt4 = ChatOpenAI(model="gpt-4", temperature=0.0)
     parser = StrOutputParser()
     image_prompt = ChatPromptTemplate.from_messages([
         ("system", "You are a helpful fashion and styling assistant. Answer the user's question using the given image context with direct references to parts of the images provided. Maintain a more conversational tone, don't make too many lists. Use markdown formatting for highlights, emphasis, and structure."),
         ("user", [
             {"type": "text", "text": "What are some ideas for styling {user_query}"},
-            {"type": "image_url", "image_url": "data:image/jpeg;base64,{image_data_1}"},
-            {"type": "image_url", "image_url": "data:image/jpeg;base64,{image_data_2}"},
+            {"type": "image_url", "image_url": "data:image/png;base64,{image_data_1}"},
+            {"type": "image_url", "image_url": "data:image/png;base64,{image_data_2}"},
         ]),
     ])
     # 프롬프트, 모델, 파서 체인을 반환
@@ -138,7 +132,7 @@ def main():
     st.title("FashionRAG: 패션 및 스타일링 어시스턴트")
 
     with st.spinner("데이터셋 설정 및 이미지 로딩 중..."):
-        dataset = setup_dataset(num_samples=10)
+        dataset = setup_dataset(num_samples=50)
         images = get_images_from_dataset(dataset)
     st.success("데이터셋 설정 및 이미지 로딩이 완료되었습니다.")
 
