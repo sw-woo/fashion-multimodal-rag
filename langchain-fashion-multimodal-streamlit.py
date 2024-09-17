@@ -41,18 +41,27 @@ def setup_dataset(num_samples=500):
     # 패션 관련 데이터셋 불러오기
     dataset_stream = load_dataset("detection-datasets/fashionpedia", split='train',streaming=True)
     # 데이터셋의 첫 500개 샘플만 가져오기
-    dataset = list(islice(dataset_stream,num_samples))
+    dataset = islice(dataset_stream,num_samples)
     # 데이터셋을 저장할 폴더 경로 설정
     dataset_folder = os.path.join(SCRIPT_DIR, 'fashion_dataset')
     # 폴더가 없으면 생성
     os.makedirs(dataset_folder, exist_ok=True)
+
     return dataset, dataset_folder
 
 # 데이터셋에서 이미지를 저장하는 함수
 def save_images(dataset, dataset_folder):
     for i, sample in enumerate(dataset):
         image = sample['image']
+
+        # 이미지 크기를 조정하여 메모리 사용량 줄이기 
+        image = image.resize((256, 256))
+
         image.save(os.path.join(dataset_folder, f'image_{i+1}.png'))
+
+        # 처리 후 이미지 객체 삭제하여 메모리 해제
+        del image
+
     print(f"{len(dataset)}개의 이미지를 {dataset_folder}에 저장했습니다.")
     
 
