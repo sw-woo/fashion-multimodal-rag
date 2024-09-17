@@ -51,6 +51,7 @@ def setup_dataset(num_samples=500):
 
 # 데이터셋에서 이미지를 저장하는 함수
 def save_images(dataset, dataset_folder):
+    count = 0
     for i, sample in enumerate(dataset):
         image = sample['image']
 
@@ -61,8 +62,9 @@ def save_images(dataset, dataset_folder):
 
         # 처리 후 이미지 객체 삭제하여 메모리 해제
         del image
+        count +=1
 
-    print(f"{len(dataset)}개의 이미지를 {dataset_folder}에 저장했습니다.")
+    print(f"{count}개의 이미지를 {dataset_folder}에 저장했습니다.")
     
 
 # Chroma 데이터베이스를 설정하는 함수
@@ -203,7 +205,7 @@ def main():
             add_images_to_db(image_vdb, dataset_folder)
         st.success("벡터 데이터베이스 설정 및 이미지 추가가 완료되었습니다.")
     else:
-        st.info("벡터 데이터베이스가 이미 설정되어 있습니다. 데이터베이스 설정을 건너뜁니다.")
+        st.info("벡터 데이터베이스가 설정되었습니다.")
         image_vdb = setup_chroma_db()
 
     vision_chain = setup_vision_chain()
