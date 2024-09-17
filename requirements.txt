@@ -10,6 +10,6 @@ datasets
 chromadb
 torch
 open-clip-torch
-protobuf>=3.20, <6
+protobuf==3.20
 requests>=2.27, <3
 toml>=0.10.1, <2
