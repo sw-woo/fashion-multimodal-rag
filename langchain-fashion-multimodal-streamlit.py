@@ -16,6 +16,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
 
+from itertools import islice
+
 
 
 # .env 파일에서 환경 변수 로드
@@ -35,9 +37,11 @@ os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 데이터셋을 설정하는 함수
-def setup_dataset():
+def setup_dataset(num_samples=500):
     # 패션 관련 데이터셋 불러오기
-    dataset = load_dataset("detection-datasets/fashionpedia")
+    dataset_stream = load_dataset("detection-datasets/fashionpedia", split='train',streaming=True)
+    # 데이터셋의 첫 500개 샘플만 가져오기
+    dataset = list(islice(dataset_stream,num_samples))
     # 데이터셋을 저장할 폴더 경로 설정
     dataset_folder = os.path.join(SCRIPT_DIR, 'fashion_dataset')
     # 폴더가 없으면 생성
@@ -45,12 +49,12 @@ def setup_dataset():
     return dataset, dataset_folder
 
 # 데이터셋에서 이미지를 저장하는 함수
-def save_images(dataset, dataset_folder, num_images=1000):
-    # 주어진 수의 이미지를 저장
-    for i in range(num_images):
-        image = dataset['train'][i]['image']
+def save_images(dataset, dataset_folder):
+    for i, sample in enumerate(dataset):
+        image = sample['image']
         image.save(os.path.join(dataset_folder, f'image_{i+1}.png'))
-    print(f"{num_images}개의 이미지를 {dataset_folder}에 저장했습니다.")
+    print(f"{len(dataset)}개의 이미지를 {dataset_folder}에 저장했습니다.")
+    
 
 # Chroma 데이터베이스를 설정하는 함수
 def setup_chroma_db():
