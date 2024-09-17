@@ -37,7 +37,7 @@ os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 데이터셋을 설정하는 함수
-def setup_dataset(num_samples=70):
+def setup_dataset(num_samples=60):
     # 패션 관련 데이터셋 불러오기
     dataset_stream = load_dataset("detection-datasets/fashionpedia", split='train',streaming=True)
     # 데이터셋의 첫 500개 샘플만 가져오기
@@ -56,7 +56,7 @@ def save_images(dataset, dataset_folder):
         image = sample['image']
 
         # 이미지 크기를 조정하여 메모리 사용량 줄이기 
-        image = image.resize((128, 128))
+        image = image.resize((64, 128))
 
         image.save(os.path.join(dataset_folder, f'image_{i+1}.png'))
 
