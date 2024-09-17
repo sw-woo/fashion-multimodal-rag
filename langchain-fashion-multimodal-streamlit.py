@@ -56,7 +56,7 @@ def save_images(dataset, dataset_folder):
         image = sample['image']
 
         # 이미지 크기를 조정하여 메모리 사용량 줄이기 
-        image = image.resize((256, 256))
+        image = image.resize((128, 128))
 
         image.save(os.path.join(dataset_folder, f'image_{i+1}.png'))
 
