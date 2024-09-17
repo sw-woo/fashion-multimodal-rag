@@ -1,4 +1,3 @@
-# 베포시 chroma db에서 sqlite3를 사용하는데 오류가 나서 추가하였습니다.
 import sys
 __import__('pysqlite3')
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
@@ -9,16 +8,13 @@ import streamlit as st
 from dotenv import load_dotenv
 import chromadb
 from chromadb.utils.embedding_functions import OpenCLIPEmbeddingFunction
-from chromadb.utils.data_loaders import ImageLoader
 from datasets import load_dataset
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
-
 from itertools import islice
-
-
+from io import BytesIO
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -33,86 +29,45 @@ if not OPENAI_API_KEY:
 # OpenAI API 키 설정
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
-# 스크립트 파일의 디렉토리 경로 가져오기
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 # 데이터셋을 설정하는 함수
-def setup_dataset(num_samples=50):
+def setup_dataset(num_samples=10):
     # 패션 관련 데이터셋 불러오기
-    dataset_stream = load_dataset("detection-datasets/fashionpedia", split='train',streaming=True)
-    # 데이터셋의 첫 500개 샘플만 가져오기
-    dataset = islice(dataset_stream,num_samples)
-    # 데이터셋을 저장할 폴더 경로 설정
-    dataset_folder = os.path.join(SCRIPT_DIR, 'fashion_dataset')
-    # 폴더가 없으면 생성
-    os.makedirs(dataset_folder, exist_ok=True)
+    dataset_stream = load_dataset("detection-datasets/fashionpedia", split='train', streaming=True)
+    # 데이터셋의 첫 num_samples 샘플만 가져오기
+    dataset = list(islice(dataset_stream, num_samples))
+    return dataset
 
-    return dataset, dataset_folder
-
-# 데이터셋에서 이미지를 저장하는 함수
-def save_images(dataset, dataset_folder):
-    count = 0
+# 데이터셋에서 이미지를 가져오는 함수
+def get_images_from_dataset(dataset):
+    images = []
     for i, sample in enumerate(dataset):
         image = sample['image']
-
-        # 이미지 크기를 조정하여 메모리 사용량 줄이기 
-        image = image.resize((64, 64))
-
-        image.save(os.path.join(dataset_folder, f'image_{i+1}.png'))
-
-        # 처리 후 이미지 객체 삭제하여 메모리 해제
-        del image
-        count +=1
-
-    print(f"{count}개의 이미지를 {dataset_folder}에 저장했습니다.")
-    
+        # 이미지 크기를 조정하여 메모리 사용량 줄이기
+        image = image.resize((32, 32))
+        images.append(image)
+    return images
 
 # Chroma 데이터베이스를 설정하는 함수
 def setup_chroma_db():
     # 벡터 데이터베이스 저장 경로 설정
-    vdb_path = os.path.join(SCRIPT_DIR, 'img_vdb')
+    vdb_path = os.path.join(os.getcwd(), 'img_vdb')
     # Chroma 클라이언트 초기화
-    chroma_client = chromadb.PersistentClient(path=vdb_path,settings=Settings(),tenant=DEFAULT_TENANT,database=DEFAULT_DATABASE)
-    # 이미지 로더 및 OpenCLIP 임베딩 함수 설정
-    image_loader = ImageLoader()
+    chroma_client = chromadb.PersistentClient(path=vdb_path, settings=Settings(), tenant=DEFAULT_TENANT, database=DEFAULT_DATABASE)
+    # OpenCLIP 임베딩 함수 설정
     clip = OpenCLIPEmbeddingFunction()
     # 이미지 데이터베이스 생성 또는 가져오기
     image_vdb = chroma_client.get_or_create_collection(
-        name="Streamlit", embedding_function=clip, data_loader=image_loader)
+        name="Streamlit", embedding_function=clip)
     return image_vdb
 
-# 기존에 존재하는 이미지 IDs를 가져오는 함수
-def get_existing_ids(image_vdb,dataset_folder):
-    existing_ids = set()
-    try:
-        # dataset_folder 내의 이미지 파일 수 계산
-        num_images = len([name for name in os.listdir(dataset_folder)])
-        print(f"데이터 폴더 전체 이미지수:{num_images}")
-
-        records = image_vdb.get(include=["ids"], limit=num_images)
-        for record in records["ids"]:
-            existing_ids.update(record)
-            print(f"{len(existing_ids)}")
-    except Exception as e:
-        print(f"기존 IDs를 가져오는 중 오류 발생: {e}")
-    return existing_ids
-
 # 이미지를 데이터베이스에 추가하는 함수
-def add_images_to_db(image_vdb, dataset_folder):
-    existing_ids = get_existing_ids(image_vdb,dataset_folder)
+def add_images_to_db(image_vdb, images):
     ids = []
-    uris = []
-    # 폴더에서 이미지를 읽어와서 데이터베이스에 추가
-    for i, filename in enumerate(sorted(os.listdir(dataset_folder))):
-        if filename.endswith('.png'):
-            img_id = str(i)
-            if img_id not in existing_ids:
-                file_path = os.path.join(dataset_folder, filename)
-                ids.append(img_id)
-                uris.append(file_path)
-                print(f"증가 되는 부분 표시{len(ids)}")
+    for i, image in enumerate(images):
+        img_id = str(i)
+        ids.append(img_id)
     if ids:
-        image_vdb.add(ids=ids, uris=uris)
+        image_vdb.add(ids=ids, images=images)
         print("새로운 이미지를 데이터베이스에 추가했습니다.")
     else:
         print("추가할 새로운 이미지가 없습니다.")
@@ -123,7 +78,7 @@ def query_db(image_vdb, query, results=2):
     return image_vdb.query(
         query_texts=[query],
         n_results=results,
-        include=['uris', 'distances'])
+        include=['images', 'ids', 'distances'])
 
 # 텍스트를 지정된 언어로 번역하는 함수
 def translate(text, target_lang):
@@ -131,7 +86,7 @@ def translate(text, target_lang):
     translation_model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.0)
     # 번역에 사용할 프롬프트 생성
     translation_prompt = ChatPromptTemplate.from_messages([
-        ("system", f"You are a translator. Translate the following text to{target_lang}."),
+        ("system", f"You are a translator. Translate the following text to {target_lang}."),
         ("user", "{text}")
     ])
     # 번역 체인 설정
@@ -141,7 +96,7 @@ def translate(text, target_lang):
 
 # 시각적 정보를 처리하는 체인을 설정하는 함수
 def setup_vision_chain():
-    # GPT-4 모델을 사용하여 시각적 정보를 처리 gpt-4o or gpt-4o-mini 모델선택
+    # GPT-4 모델을 사용하여 시각적 정보를 처리
     gpt4 = ChatOpenAI(model="gpt-4o", temperature=0.0)
     parser = StrOutputParser()
     image_prompt = ChatPromptTemplate.from_messages([
@@ -162,51 +117,35 @@ def format_prompt_inputs(data, user_query):
 
     # 사용자 쿼리를 딕셔너리에 추가
     inputs['user_query'] = user_query
-    
-    image_path_1 = data['uris'][0][0]
-    image_path_2 = data['uris'][0][1]
 
-    with open(image_path_1, 'rb') as image_file:
-        image_data_1 = image_file.read()
-    inputs['image_data_1'] = base64.b64encode(image_data_1).decode('utf-8')
+    image_data_1 = data['images'][0][0]
+    image_data_2 = data['images'][0][1]
 
-    with open(image_path_2, 'rb') as image_file:
-        image_data_2 = image_file.read()
-    inputs['image_data_2'] = base64.b64encode(image_data_2).decode('utf-8')
+    # 이미지 데이터를 Base64로 인코딩
+    buffered = BytesIO()
+    image_data_1.save(buffered, format="PNG")
+    inputs['image_data_1'] = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+    buffered = BytesIO()
+    image_data_2.save(buffered, format="PNG")
+    inputs['image_data_2'] = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
     return inputs
-
-# 이미지를 Base64로 로드하는 함수
-def load_image_as_base64(image_path):
-    with open(image_path, "rb") as img_file:
-        return base64.b64encode(img_file.read()).decode("utf-8")
-    
 
 # Streamlit 앱을 실행하는 메인 함수
 def main():
     st.set_page_config(page_title="FashionRAG", layout="wide")
     st.title("FashionRAG: 패션 및 스타일링 어시스턴트")
 
-    # 데이터셋 폴더 및 이미지 존재 여부 확인
-    dataset_folder = os.path.join(SCRIPT_DIR, 'fashion_dataset')
-    if not os.path.exists(dataset_folder) or not any(fname.endswith('.png') for fname in os.listdir(dataset_folder)):
-        with st.spinner("데이터셋 설정 및 이미지 저장 중..."):
-            dataset, dataset_folder = setup_dataset()
-            save_images(dataset, dataset_folder)
-        st.success("데이터셋 설정 및 이미지 저장 중...")
-    else:
-        st.info("데이터셋이 설정되고 이미지가 저장되었습니다.")
+    with st.spinner("데이터셋 설정 및 이미지 로딩 중..."):
+        dataset = setup_dataset(num_samples=10)
+        images = get_images_from_dataset(dataset)
+    st.success("데이터셋 설정 및 이미지 로딩이 완료되었습니다.")
 
-    # 벡터 데이터베이스 설정 여부 확인
-    vdb_path = os.path.join(SCRIPT_DIR, 'img_vdb')
-    if not os.path.exists(vdb_path) or not os.listdir(vdb_path):
-        with st.spinner("벡터 데이터베이스 설정 및 이미지 추가 중..."):
-            image_vdb = setup_chroma_db()
-            add_images_to_db(image_vdb, dataset_folder)
-        st.success("벡터 데이터베이스 설정 및 이미지 추가가 완료되었습니다.")
-    else:
-        st.info("벡터 데이터베이스가 설정되었습니다.")
+    with st.spinner("벡터 데이터베이스 설정 및 이미지 추가 중..."):
         image_vdb = setup_chroma_db()
+        add_images_to_db(image_vdb, images)
+    st.success("벡터 데이터베이스 설정 및 이미지 추가가 완료되었습니다.")
 
     vision_chain = setup_vision_chain()
 
@@ -220,22 +159,20 @@ def main():
             results = query_db(image_vdb, query_en, results=2)
 
             # 쿼리 결과 확인
-            if not results or not results.get('uris') or not results['uris'][0]:
+            if not results or not results.get('images') or not results['images'][0]:
                 st.error("쿼리 결과가 없습니다. 다른 질문을 시도해 보세요.")
+                return
 
             prompt_input = format_prompt_inputs(results, query_en)
             response_en = vision_chain.invoke(prompt_input)
             response_ko = translate(response_en, "Korean")
 
         st.subheader("검색된 이미지:")
-        for idx, uri in enumerate(results['uris'][0]):
-            img_base64 = load_image_as_base64(uri)
-            img_data_url = f"data:image/png;base64,{img_base64}"
-            st.image(img_data_url, caption=f"ID: {results['ids'][0][idx]}", width=300)
+        for idx, image in enumerate(results['images'][0]):
+            st.image(image, caption=f"ID: {results['ids'][0][idx]}", width=300)
 
         st.subheader("FashionRAG의 응답:")
         st.markdown(response_ko)
-
 
 if __name__ == "__main__":
     main()
